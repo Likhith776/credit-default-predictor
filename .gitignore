@@ -1,0 +1,23 @@
+# --- Data: never commit raw or processed datasets ---
+data/
+
+# --- Python artifacts ---
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.ipynb_checkpoints/
+
+# --- Environments & secrets ---
+.env
+.venv/
+venv/
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
+
+# --- NOTE: models/*.pkl and models/*.json ARE tracked (via Git LFS) ---
+# They ship with the repo so the Streamlit app can serve predictions
+# without a rebuild. See .gitattributes for LFS routing.
+# (Nothing to un-ignore here — the rules above never excluded them.)

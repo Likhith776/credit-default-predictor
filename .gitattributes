@@ -1,0 +1,7 @@
+# Git LFS: model artifacts are large binaries — track them with LFS
+# while keeping them versioned and deployable with the Streamlit app.
+models/*.pkl filter=lfs diff=lfs merge=lfs -text
+models/*.json filter=lfs diff=lfs merge=lfs -text
+# CSV/parquet should never be treated as text by git diff/merge
+*.csv -text
+*.parquet -text
