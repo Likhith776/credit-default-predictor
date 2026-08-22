@@ -18,7 +18,7 @@ just say *how risky* an applicant is, it shows *why*.
 
 ## 🔮 Live Demo
 
-**Try the live prediction app → [credit-default-predictor.streamlit.app](https://credit-default-predictor.streamlit.app)**
+**Try the live prediction app → [credit-default-predictor1.streamlit.app](https://credit-default-predictor1.streamlit.app)**
 
 Enter an applicant's income, loan size, and history — get an instant default
 probability gauge, a risk verdict, and a per-applicant SHAP breakdown of the
