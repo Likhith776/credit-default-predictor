@@ -1,4 +1,4 @@
-// Frontend config — set API_BASE to your deployed FastAPI origin
-// (e.g. "https://credit-default-api.onrender.com") before deploying.
-// Local dev default points at `uvicorn api.main:app --port 8000`.
-window.API_BASE = window.API_BASE || "http://localhost:8000";
+// Frontend config — API_BASE points at the deployed FastAPI service on Render.
+// Local dev: run `uvicorn api.main:app --port 8000` and use
+// "http://localhost:8000" instead.
+window.API_BASE = window.API_BASE || "https://credit-default-predictor-k5am.onrender.com";

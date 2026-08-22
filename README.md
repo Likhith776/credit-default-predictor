@@ -25,9 +25,8 @@ probability gauge, a risk verdict, and a per-applicant SHAP breakdown of the
 top factors that moved that specific score. The Model Insights tab shows the
 global feature importance and SHAP summary plots from training.
 
-<!-- Live site: uncomment and fill the deployed custom-frontend URL here, e.g.
-**Custom frontend (GSAP + FastAPI) → [your-site.vercel.app](https://your-site.vercel.app)**
--->
+**Custom frontend (GSAP + FastAPI) → [credit-default-predictor-psi.vercel.app](https://credit-default-predictor-psi.vercel.app)**
+· Model API: [credit-default-predictor-k5am.onrender.com](https://credit-default-predictor-k5am.onrender.com)
 
 ## 📈 Model Performance
 

@@ -41,14 +41,15 @@ EDUCATION_LEVELS = [
 ]
 CONTRACT_TYPES = ["Cash loans", "Revolving loans"]
 
-# Frontend origins allowed to call the API. The deployed Vercel/Netlify URL
-# should be added here (or set via the API_ORIGINS env var, comma-separated).
+# Frontend origins allowed to call the API. Extra origins can be added via
+# the API_ORIGINS env var (comma-separated).
 ALLOWED_ORIGINS = [
     "http://localhost:5500",
     "http://127.0.0.1:5500",
     "http://localhost:3000",
     "http://localhost:8080",
     "http://localhost:8000",
+    "https://credit-default-predictor-psi.vercel.app",
 ]
 
 
