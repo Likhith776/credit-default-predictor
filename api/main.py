@@ -186,6 +186,20 @@ def risk_tier(probability: float) -> str:
 
 # ------------------------------------------------------------------ routes
 
+@app.get("/")
+def root() -> dict:
+    return {
+        "service": "Credit Default Predictor API",
+        "endpoints": {
+            "GET /health": "liveness + model metadata (warm-up ping)",
+            "POST /predict": "score one application; returns probability, risk_tier, shap_top_factors",
+            "GET /docs": "interactive OpenAPI documentation",
+        },
+        "model": "LightGBM",
+        "n_features": len(FEATURE_NAMES),
+    }
+
+
 @app.get("/health")
 def health() -> dict:
     return {
