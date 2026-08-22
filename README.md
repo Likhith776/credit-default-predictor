@@ -18,7 +18,7 @@ just say *how risky* an applicant is, it shows *why*.
 
 ## 🔮 Live Demo
 
-**Try the live site → [credit-default-predictor-psi.vercel.app](https://credit-default-predictor-psi.vercel.app)**
+**Try the [live app](https://credit-default-predictor-psi.vercel.app)**
 
 Enter an applicant's income, loan size, and history — get an animated default
 probability gauge, a risk verdict, and a per-applicant SHAP breakdown of the
@@ -26,7 +26,7 @@ top factors that moved that specific score. Scroll the pinned five-stage
 pipeline walkthrough, and every metric on the site is pulled from the real
 training artifacts.
 
-Model API: [credit-default-predictor-k5am.onrender.com](https://credit-default-predictor-k5am.onrender.com)
+[API backend](https://credit-default-predictor-k5am.onrender.com)
 (`/predict` · `/health` · `/docs`)
 
 ## 📈 Model Performance
