@@ -349,15 +349,11 @@
     // applicant's final probability. Segments are positioned cumulatively;
     // a "down" factor occupies the range it removed.
     let cum = baseP, segs = [];
-    segs.push({ left: 0, width: baseP, cls: "base", label: null });
+    segs.push({ left: 0, width: baseP, cls: "base" });
     factors.forEach((f) => {
       const after = cum + f.risk_points / 100;
       const lo = Math.min(cum, after), hi = Math.max(cum, after);
-      segs.push({
-        left: lo, width: hi - lo,
-        cls: f.risk_points >= 0 ? "up" : "down",
-        label: Math.abs(f.risk_points) >= 3 ? `${f.risk_points > 0 ? "+" : "−"}${Math.abs(f.risk_points)}` : null,
-      });
+      segs.push({ left: lo, width: hi - lo, cls: f.risk_points >= 0 ? "up" : "down" });
       cum = after;
     });
     if (otherPts) {
@@ -373,9 +369,7 @@
     const meter = $("#wfMeter");
     meter.innerHTML =
       segs.map((s) => `
-        <div class="wfm-seg ${s.cls}" data-l="${(s.left * 100).toFixed(2)}" data-w="${(s.width * 100).toFixed(2)}">
-          ${s.label ? `<span>${s.label}</span>` : ""}
-        </div>`).join("") +
+        <div class="wfm-seg ${s.cls}" data-l="${(s.left * 100).toFixed(2)}" data-w="${(s.width * 100).toFixed(2)}"></div>`).join("") +
       `<div class="wfm-marker" data-l="${(finalP * 100).toFixed(2)}"></div>`;
     $("#wfMeterBase").textContent = `BASELINE ${(baseP * 100).toFixed(0)}%`;
     $("#wfMeterFinal").textContent = `THIS APPLICANT ${(finalP * 100).toFixed(1)}%`;

@@ -275,7 +275,6 @@ h2 { font-size: clamp(34px, 5vw, 56px); letter-spacing: -0.02em; margin-bottom: 
 .wfm-seg.up { background: var(--up); box-shadow: 0 0 12px rgba(248, 113, 113, 0.45); }
 .wfm-seg.down { background: var(--down); box-shadow: 0 0 12px rgba(34, 211, 238, 0.45); }
 .wfm-seg.other { background: repeating-linear-gradient(45deg, var(--text-faint), var(--text-faint) 3px, transparent 3px, transparent 6px); }
-.wfm-seg span { font-family: var(--font-mono); font-size: 9px; font-weight: 600; color: #0A0A0B; }
 .wfm-marker { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #fff; box-shadow: 0 0 8px rgba(255, 255, 255, 0.8); }
 .wf-meter-scale { display: flex; justify-content: space-between; font-size: 9.5px; color: var(--text-faint); letter-spacing: 0.1em; margin-bottom: 18px; }
 
