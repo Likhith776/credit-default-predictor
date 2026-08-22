@@ -133,6 +133,162 @@ def agg_credit_card(cc_df: pd.DataFrame) -> pd.DataFrame:
     return feats
 
 
+# ---------------------------------------------------------------------------
+# Trend / velocity aggregators — capture direction of change, not just level
+# (MONTHS_BALANCE is negative and relative to application date, so the
+# largest values are the most recent months).
+# ---------------------------------------------------------------------------
+
+def _recent_vs_full(sorted_df: pd.DataFrame, group_col: str, col: str,
+                    prefix: str) -> pd.DataFrame:
+    """Per-group last-3-month mean, full-history mean, trend, and MoM diff.
+
+    trend = last3_mean - full_mean  (positive => worsening for DPD/util)
+    diff  = month-over-month change of the series, aggregated mean/max
+    """
+    g = sorted_df.groupby(group_col)
+    feats = pd.DataFrame(index=g.size().index)
+    feats[f"{prefix}_MEAN"] = g[col].mean()
+    recent = g.tail(3).groupby(group_col)[col].mean()
+    feats[f"{prefix}_LAST3_MEAN"] = recent
+    feats[f"{prefix}_TREND"] = feats[f"{prefix}_LAST3_MEAN"] - feats[f"{prefix}_MEAN"]
+    diffs = g[col].diff()
+    feats[f"{prefix}_DIFF_MEAN"] = diffs.groupby(sorted_df[group_col]).mean()
+    feats[f"{prefix}_DIFF_MAX"] = diffs.groupby(sorted_df[group_col]).max()
+    return feats
+
+
+def agg_bureau_trends(bureau_df: pd.DataFrame, bureau_balance_df: pd.DataFrame) -> pd.DataFrame:
+    """Bureau monthly DPD trend features, lifted from loan level to client.
+
+    A client whose bureau DPD is climbing month over month is a different
+    risk than one who has been flat at the same average.
+    """
+    bb = bureau_balance_df.copy()
+    bb["DPD"] = bb["STATUS"].map(STATUS_TO_DPD)
+    bb = bb.sort_values(["SK_ID_BUREAU", "MONTHS_BALANCE"])
+
+    loan_feats = _recent_vs_full(bb, "SK_ID_BUREAU", "DPD", "BB_DPD")
+    bur = bureau_df[["SK_ID_CURR", "SK_ID_BUREAU"]].merge(
+        loan_feats, on="SK_ID_BUREAU", how="inner"
+    )
+    client = bur.groupby("SK_ID_CURR")[loan_feats.columns].mean()
+    client = client.rename(columns={
+        "BB_DPD_LAST3_MEAN": "BUREAU_DPD_LAST3_MEAN",
+        "BB_DPD_TREND": "BUREAU_DPD_TREND",
+        "BB_DPD_DIFF_MEAN": "BUREAU_DPD_DIFF_MEAN",
+        "BB_DPD_DIFF_MAX": "BUREAU_DPD_DIFF_MAX",
+    })
+    return client[["BUREAU_DPD_LAST3_MEAN", "BUREAU_DPD_TREND",
+                   "BUREAU_DPD_DIFF_MEAN", "BUREAU_DPD_DIFF_MAX"]]
+
+
+def agg_pos_trends(pos_df: pd.DataFrame) -> pd.DataFrame:
+    """POS/cash DPD direction-of-change features per SK_ID_CURR."""
+    pos = pos_df.sort_values(["SK_ID_CURR", "MONTHS_BALANCE"])
+    feats = _recent_vs_full(pos, "SK_ID_CURR", "SK_DPD", "POS_SK_DPD")
+    feats = feats.join(_recent_vs_full(pos, "SK_ID_CURR", "SK_DPD_DEF", "POS_SK_DPD_DEF"))
+    return feats
+
+
+def agg_credit_card_trends(cc_df: pd.DataFrame) -> pd.DataFrame:
+    """Credit-card utilization and balance velocity per SK_ID_CURR.
+
+    Rising utilization into the application is the classic distress signal.
+    """
+    cc = cc_df.copy()
+    cc["UTILIZATION"] = cc["AMT_BALANCE"] / (cc["AMT_CREDIT_LIMIT_ACTUAL"] + 1)
+    cc = cc.sort_values(["SK_ID_CURR", "MONTHS_BALANCE"])
+    feats = _recent_vs_full(cc, "SK_ID_CURR", "UTILIZATION", "CC_UTILIZATION")
+    feats = feats.join(_recent_vs_full(cc, "SK_ID_CURR", "AMT_BALANCE", "CC_AMT_BALANCE"))
+    return feats
+
+
+# ---------------------------------------------------------------------------
+# Peer-rank (cross-sectional percentile) features
+# ---------------------------------------------------------------------------
+
+RANKED_FEATURES = [
+    "CREDIT_INCOME_RATIO",
+    "ANNUITY_INCOME_RATIO",
+    "CREDIT_TERM",
+    "DAYS_EMPLOYED_RATIO",
+    "INCOME_PER_PERSON",
+    "EXT_SOURCE_MEAN",
+]
+
+# value feature -> list of cohort columns to rank within
+GROUP_RANKS = {
+    "CREDIT_INCOME_RATIO": ["NAME_INCOME_TYPE", "ORGANIZATION_TYPE"],
+    "EXT_SOURCE_MEAN": ["NAME_INCOME_TYPE"],
+}
+
+RANK_EDGES_PATH = "data/processed/rank_edges.json"
+
+
+def _edges_from_series(s: pd.Series) -> list[float]:
+    """101 quantile cut points (0..1) approximating the full rank distribution."""
+    return [float(v) for v in s.quantile(np.linspace(0, 1, 101))]
+
+
+def _pct_rank(values: pd.Series, edges: list[float]) -> pd.Series:
+    """Percentile of each value against fixed cut points (no refitting)."""
+    return pd.Series(
+        np.searchsorted(np.asarray(edges), values.to_numpy(), side="right") / 100.0,
+        index=values.index,
+    )
+
+
+def _add_rank_features(df: pd.DataFrame, fit_ranks: bool = True,
+                       edges_path: str = RANK_EDGES_PATH) -> pd.DataFrame:
+    """Add RANK_* columns, fit on train / apply frozen cut points to test.
+
+    On the training split the quantile edges (global and per cohort) are
+    computed from train rows only and saved to ``edges_path``; on any later
+    split those same edges are loaded and reused, so test rows never leak
+    into the ranking. Unseen cohort values fall back to the global edges.
+    """
+    import json as _json
+    from pathlib import Path as _Path
+
+    fill = {c: df[c].median() for c in RANKED_FEATURES}
+
+    if fit_ranks:
+        edges: dict = {"__global__": {}, "__groups__": {}}
+        for col in RANKED_FEATURES:
+            filled = df[col].fillna(fill[col])
+            edges["__global__"][col] = _edges_from_series(filled)
+            df[f"RANK_{col}"] = filled.rank(pct=True)
+            for group_col in GROUP_RANKS.get(col, []):
+                df[f"RANK_{col}_BY_{group_col.replace('NAME_', '')}"] = (
+                    filled.groupby(df[group_col]).rank(pct=True)
+                )
+                edges["__groups__"][f"{col}|{group_col}"] = {
+                    str(k): _edges_from_series(v)
+                    for k, v in filled.groupby(df[group_col])
+                }
+        _Path(edges_path).parent.mkdir(parents=True, exist_ok=True)
+        _Path(edges_path).write_text(_json.dumps(edges))
+        print(f"[features] fit rank edges on train -> {edges_path}")
+        return df
+
+    # Apply mode: reuse the training cut points exactly
+    edges = _json.loads(_Path(edges_path).read_text())
+    for col in RANKED_FEATURES:
+        filled = df[col].fillna(fill[col])
+        df[f"RANK_{col}"] = _pct_rank(filled, edges["__global__"][col])
+        for group_col in GROUP_RANKS.get(col, []):
+            group_edges = edges["__groups__"][f"{col}|{group_col}"]
+            out = pd.Series(index=df.index, dtype=float)
+            for name, idx in df.groupby(group_col).groups.items():
+                out.loc[idx] = _pct_rank(
+                    filled.loc[idx], group_edges.get(str(name), edges["__global__"][col])
+                )
+            df[f"RANK_{col}_BY_{group_col.replace('NAME_', '')}"] = out
+    print(f"[features] applied train rank edges (frozen) from {edges_path}")
+    return df
+
+
 def _app_domain_features(df: pd.DataFrame) -> pd.DataFrame:
     """Domain ratios and EXT_SOURCE combos derived from application columns."""
     df["CREDIT_INCOME_RATIO"] = df["AMT_CREDIT"] / (df["AMT_INCOME_TOTAL"] + 1)
@@ -156,6 +312,7 @@ def build_features(
     inst_df: pd.DataFrame,
     cc_df: pd.DataFrame,
     pos_df: pd.DataFrame,
+    fit_ranks: bool = True,
 ) -> pd.DataFrame:
     """Assemble the final modeling table keyed by SK_ID_CURR."""
     df = app_df.copy()
@@ -166,6 +323,9 @@ def build_features(
         "inst": lambda: agg_installments(inst_df),
         "pos": lambda: agg_pos_cash(pos_df),
         "cc": lambda: agg_credit_card(cc_df),
+        "bureau_trends": lambda: agg_bureau_trends(bureau_df, bb_df),
+        "pos_trends": lambda: agg_pos_trends(pos_df),
+        "cc_trends": lambda: agg_credit_card_trends(cc_df),
     }
     for name, build in agg_tables.items():
         print(f"[features] aggregating {name}...", flush=True)
@@ -174,6 +334,9 @@ def build_features(
     print("[features] merging done", flush=True)
 
     df = _app_domain_features(df)
+    # Peer ranks run before one-hot encoding so cohort columns still exist;
+    # fit_ranks=True computes the quantile edges, False reuses them frozen.
+    df = _add_rank_features(df, fit_ranks=fit_ranks)
     obj_cols = df.select_dtypes(include=["object", "str"]).columns.tolist()
     df = pd.get_dummies(df, columns=obj_cols, drop_first=True)
     df = df.replace([np.inf, -np.inf], np.nan).fillna(-999)
@@ -200,6 +363,7 @@ if __name__ == "__main__":
         inst_df=data["installments"],
         cc_df=data["credit_card"],
         pos_df=data["pos_cash"],
+        fit_ranks=(args.split == "train"),
     )
     out = f"data/processed/{args.split}_features.parquet"
     features.to_parquet(out, index=False)

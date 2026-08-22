@@ -29,8 +29,8 @@ global feature importance and SHAP summary plots from training.
 
 | Metric | Score |
 |--------|-------|
-| **CV AUC (5-fold)** | **0.781 ± 0.003** |
-| **Gini Coefficient** | **0.562** |
+| **CV AUC (5-fold)** | **0.781 ± 0.004** |
+| **Gini Coefficient** | **0.563** |
 | **Validation AUC (80/20 holdout)** | **0.783** |
 
 *Gini = 2 × AUC − 1, the conventional scale in credit scoring — values above
@@ -44,7 +44,7 @@ The competition's edge isn't the model — it's the features. Five aggregation
 functions collapse six auxiliary tables into one row per applicant:
 
 | Data source | Rows | What was extracted |
-|---|---|---|
+|---|---|---|---|
 | `application_{train,test}.csv` | 307K / 48K | Base demographics, income, loan terms, building info (one-hot encoded) |
 | `bureau.csv` + `bureau_balance.csv` | 1.7M + 27M | Credit count, active/closed mix, credit sums, **monthly days-past-due stats** per client |
 | `previous_application.csv` | 1.7M | Prior application count, approval rate, typical amounts, down payments |
@@ -62,6 +62,26 @@ eyeball first:
 | `CREDIT_TERM` | `AMT_CREDIT / AMT_ANNUITY` | How many years the loan runs (higher = longer exposure) |
 | `DAYS_EMPLOYED_RATIO` | `DAYS_EMPLOYED / DAYS_BIRTH` | Fraction of life spent in stable employment |
 | `INCOME_PER_PERSON` | `AMT_INCOME_TOTAL / CNT_FAM_MEMBERS` | Household income pressure |
+
+Two further feature families extend the flat aggregations:
+
+**Peer-rank (cross-sectional percentile) features.** Each key ratio also gets
+a `RANK_*` version showing where the applicant sits relative to all other
+applicants (`rank(pct=True)`), plus cohort-relative ranks — e.g.
+`RANK_CREDIT_INCOME_RATIO_BY_INCOME_TYPE` and
+`RANK_EXT_SOURCE_MEAN_BY_INCOME_TYPE` — because "risky relative to your
+income bracket" is different from "risky in absolute terms." Quantile cut
+points are fit on the training split only and applied frozen to test, so no
+test row leaks into the ranking.
+
+**Trend / velocity features from the monthly tables.** The monthly-history
+tables (bureau_balance, POS_CASH_balance, credit_card_balance) are time
+series, so beyond level aggregates the pipeline extracts direction of change:
+last-3-month mean vs. full-history mean and their difference (e.g.
+`CC_UTILIZATION_LAST3_MEAN`, `CC_UTILIZATION_TREND`), plus month-over-month
+diff aggregates (`*_DIFF_MEAN`, `*_DIFF_MAX`) for DPD and utilization. A
+customer whose DPD or card utilization is *climbing* month to month is a
+different risk than one who has been flat at the same average.
 
 It pays off: `EXT_SOURCE_MEAN` and `CREDIT_TERM` — both built in this repo —
 rank in the top features by gain.
@@ -200,7 +220,10 @@ they are not calibrated to any real business cost function (the cost of a
 missed default vs. a wrongly declined customer). No fairness or
 disparate-impact testing has been performed across protected attributes.
 Any real deployment would require calibration, fairness audits, and
-regulatory review before informing actual credit decisions.
+regulatory review before informing actual credit decisions. Additionally,
+the peer-rank features are computed against the training population and
+would need periodic recalibration in a real deployment as the applicant
+pool shifts over time.
 
 ## 📄 License
 
