@@ -435,6 +435,10 @@
     btn.disabled = true;
     status.textContent = "SCORING AGAINST LIVE MODEL…";
     status.classList.remove("is-error");
+    // cold-start warning if the free-tier server has slept since the warm-up
+    const coldNote = setTimeout(() => {
+      status.textContent = "COLD START — WAKING THE MODEL SERVER, THIS CAN TAKE UP TO A MINUTE…";
+    }, 3000);
     try {
       const res = await fetch(`${window.API_BASE}/predict`, {
         method: "POST",
@@ -454,6 +458,7 @@
       status.textContent = `API UNREACHABLE — IS THE SERVICE RUNNING AT ${window.API_BASE}? (${err.message})`;
       status.classList.add("is-error");
     } finally {
+      clearTimeout(coldNote);
       btn.disabled = false;
     }
   });
@@ -477,7 +482,16 @@
   const minTime = new Promise((r) => setTimeout(r, REDUCED ? 200 : 1100));
   const fonts = document.fonts ? document.fonts.ready : Promise.resolve();
 
+  // If the model server is cold-starting (Render free tier sleeps after idle),
+  // tell the visitor instead of hanging in silence.
+  const loaderLabel = $("#loaderLabel");
+  const wakeNote = setTimeout(() => {
+    if (loaderLabel)
+      loaderLabel.textContent = "WAKING MODEL SERVER — FREE TIER SLEEPS WHEN IDLE · CAN TAKE ~60s";
+  }, 2600);
+
   if (REDUCED) {
+    clearTimeout(wakeNote);
     Promise.all([warmup, minTime]).then(() => { loader.style.display = "none"; ScrollTrigger.refresh(); });
   } else {
     const prog = { v: 0 };
@@ -489,6 +503,7 @@
       },
     });
     Promise.all([warmup, minTime, fonts]).then(() => {
+      clearTimeout(wakeNote);
       gsap.to(prog, {
         v: 100, duration: 0.25,
         onUpdate: () => {
