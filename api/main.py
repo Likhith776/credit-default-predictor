@@ -57,6 +57,25 @@ def clean_name(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9_]+", "_", name)
 
 
+def _load_artifact(path: Path):
+    """joblib-load a model artifact, with a clear error if Git LFS didn't smudge it.
+
+    Render/Railway clones sometimes fetch LFS files as ~130-byte text pointers;
+    joblib would fail with a confusing "invalid load key" — catch it here with
+    an actionable message instead.
+    """
+    if path.exists() and path.stat().st_size < 1024:
+        head = path.read_bytes()[:64]
+        if head.startswith(b"version https://git-lfs"):
+            raise RuntimeError(
+                f"{path.name} is a Git LFS pointer, not the real artifact. "
+                f"Make sure the deploy environment fetches LFS objects "
+                f"(e.g. run `git lfs install && git lfs pull` in the build, "
+                f"or download the file from the GitHub release/raw media URL)."
+            )
+    return joblib.load(path)
+
+
 # ------------------------------------------------------------------ startup
 
 app = FastAPI(title="Credit Default Predictor API", version="1.0.0")
@@ -71,8 +90,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-model = joblib.load(MODEL_DIR / "lgb_model.pkl")
-shap_explainer = joblib.load(MODEL_DIR / "shap_explainer.pkl")
+model = _load_artifact(MODEL_DIR / "lgb_model.pkl")
+shap_explainer = _load_artifact(MODEL_DIR / "shap_explainer.pkl")
 FEATURE_NAMES: list[str] = json.loads((MODEL_DIR / "feature_names.json").read_text())
 MEDIANS: dict[str, float] = json.loads((MODEL_DIR / "training_medians.json").read_text())
 METRICS: dict = json.loads((MODEL_DIR / "model_metrics.json").read_text())
