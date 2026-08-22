@@ -1,8 +1,13 @@
-# Deployment-only deps for the Streamlit app (subset of root requirements.txt)
-streamlit==1.28.0
-pandas==2.1.0
-numpy==1.26.0
-scikit-learn==1.3.0
-lightgbm==4.1.0
-joblib==1.3.2
-plotly==5.18.0
+# Deployment-only deps for the Streamlit app.
+# Loose minimum bounds so Streamlit Community Cloud can resolve wheels for
+# whichever Python version the app runtime uses; strict dev pins live in the
+# root requirements.txt.
+streamlit>=1.40
+pandas>=2.2
+numpy>=1.26
+scikit-learn>=1.4
+lightgbm>=4.4
+joblib>=1.3
+plotly>=5.20
+Pillow>=10.0
+shap>=0.45

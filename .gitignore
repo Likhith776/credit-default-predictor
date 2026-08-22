@@ -21,3 +21,4 @@ Thumbs.db
 # They ship with the repo so the Streamlit app can serve predictions
 # without a rebuild. See .gitattributes for LFS routing.
 # (Nothing to un-ignore here — the rules above never excluded them.)
+*.log

@@ -26,6 +26,7 @@ DEFAULT_DATA_DIR = "data/raw"
 # Canonical file names in the Kaggle competition download.
 FILE_NAMES = {
     "application": "application_train.csv",
+    "application_test": "application_test.csv",
     "bureau": "bureau.csv",
     "bureau_balance": "bureau_balance.csv",
     "previous_application": "previous_application.csv",
@@ -136,6 +137,7 @@ def load_credit_card(path: str | Path = f"{DEFAULT_DATA_DIR}/credit_card_balance
 
 _LOADERS = {
     "application": load_application,
+    "application_test": load_application,
     "bureau": load_bureau,
     "bureau_balance": load_bureau_balance,
     "previous_application": load_previous_applications,
