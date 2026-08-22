@@ -158,7 +158,17 @@ def build_feature_vector(inp: ApplicantInput) -> pd.DataFrame:
     return vec.to_frame().T
 
 
-def top_shap_factors(explainer, X: pd.DataFrame, k: int = 8) -> list[dict]:
+def top_shap_factors(explainer, X: pd.DataFrame, k: int = 8) -> tuple[list[dict], float, float]:
+    """Top-k factors plus the walk from baseline to this applicant's score.
+
+    Returns (factors, baseline_probability, other_factors_points). Each factor
+    gets ``risk_points``: the change in default probability (percentage
+    points) when its SHAP contribution is added to the running log-odds sum.
+    The walk is exact in log-odds (SHAP is additive there) and only converted
+    to probability points for display.
+    """
+    import math
+
     sv = explainer.shap_values(X)
     if isinstance(sv, list):  # older shap: [class0, class1]
         sv = sv[1]
@@ -166,15 +176,31 @@ def top_shap_factors(explainer, X: pd.DataFrame, k: int = 8) -> list[dict]:
     if sv.ndim == 3:  # newer shap: (rows, features, classes)
         sv = sv[0, :, 1]
     sv = sv.reshape(-1)
+
+    base = explainer.expected_value
+    if hasattr(base, "__len__"):
+        base = float(base[-1])
+    base = float(base)
+
+    sigmoid = lambda x: 1.0 / (1.0 + math.exp(-x))
     order = np.abs(sv).argsort()[::-1][:k]
-    return [
-        {
+
+    factors, cum_logodds, p_prev = [], base, sigmoid(base)
+    for i in order:
+        cum_logodds += float(sv[i])
+        p_now = sigmoid(cum_logodds)
+        factors.append({
             "feature": FEATURE_NAMES[i],
             "value": float(X.iloc[0, i]),
             "impact": float(sv[i]),
-        }
-        for i in order
-    ]
+            "risk_points": round((p_now - p_prev) * 100.0, 1),
+        })
+        p_prev = p_now
+
+    # Everything outside the top-k, as one aggregate step at the end
+    other = float(sv.sum()) - sum(f["impact"] for f in factors)
+    other_points = round((sigmoid(base + float(sv.sum())) - p_prev) * 100.0, 1)
+    return factors, round(sigmoid(base), 4), other_points
 
 
 def risk_tier(probability: float) -> str:
@@ -215,8 +241,11 @@ def health() -> dict:
 def predict(inp: ApplicantInput) -> dict:
     X = build_feature_vector(inp)
     probability = float(model.predict_proba(X)[0, 1])
+    factors, baseline_p, other_points = top_shap_factors(shap_explainer, X)
     return {
         "probability": probability,
         "risk_tier": risk_tier(probability),
-        "shap_top_factors": top_shap_factors(shap_explainer, X),
+        "baseline_probability": baseline_p,
+        "other_factors_points": other_points,
+        "shap_top_factors": factors,
     }

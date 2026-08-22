@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css" />
-  <script src="js/config.js"></script>
+  <link rel="stylesheet" href="css/style.css?v=3" />
+  <script src="js/config.js?v=3"></script>
 </head>
 <body>
 
@@ -258,10 +258,15 @@
                 <span class="card-title">WHY THIS SCORE</span>
                 <span class="wf-legend mono">▲ raises risk&nbsp;&nbsp;▼ lowers risk</span>
               </div>
+              <div class="wf-meter" id="wfMeter" aria-hidden="true"></div>
+              <div class="wf-meter-scale mono">
+                <span id="wfMeterBase">BASELINE —</span>
+                <span id="wfMeterFinal">THIS APPLICANT —</span>
+              </div>
               <div class="wf-real-bars" id="wfRealBars">
                 <p class="wf-empty">Submit an application to generate a per-applicant SHAP explanation.</p>
               </div>
-              <p class="wf-caption">These factors moved <em>this specific</em> applicant's score — not the model's overall top features.</p>
+              <p class="wf-caption">Each factor moved this specific applicant's score from the model's baseline — the meter above sums every contribution into the final probability.</p>
             </div>
           </div>
         </div>
@@ -345,6 +350,6 @@
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.14/dist/lenis.min.js"></script>
-  <script src="js/main.js"></script>
+  <script src="js/main.js?v=3"></script>
 </body>
 </html>

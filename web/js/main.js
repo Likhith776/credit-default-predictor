@@ -341,33 +341,86 @@
     });
   }
 
-  function renderWaterfall(factors) {
-    const max = Math.max(...factors.map((f) => Math.abs(f.impact))) || 1;
+  function renderWaterfall(factors, meta) {
+    const { baseline_probability: baseP, other_factors_points: otherPts, probability } = meta || {};
+    const maxPts = Math.max(...factors.map((f) => Math.abs(f.risk_points)), 1);
+
+    // Risk build-up meter: baseline + each factor's ±points lands on the
+    // applicant's final probability. Segments are positioned cumulatively;
+    // a "down" factor occupies the range it removed.
+    let cum = baseP, segs = [];
+    segs.push({ left: 0, width: baseP, cls: "base", label: null });
+    factors.forEach((f) => {
+      const after = cum + f.risk_points / 100;
+      const lo = Math.min(cum, after), hi = Math.max(cum, after);
+      segs.push({
+        left: lo, width: hi - lo,
+        cls: f.risk_points >= 0 ? "up" : "down",
+        label: Math.abs(f.risk_points) >= 3 ? `${f.risk_points > 0 ? "+" : "−"}${Math.abs(f.risk_points)}` : null,
+      });
+      cum = after;
+    });
+    if (otherPts) {
+      const after = cum + otherPts / 100;
+      const lo = Math.min(cum, after), hi = Math.max(cum, after);
+      segs.push({ left: lo, width: hi - lo, cls: "other", label: null });
+      cum = after;
+    }
+    // anchor the marker to the model's exact probability; the pts walk is
+    // rounded to 1 decimal and can drift a tenth of a point from it
+    const finalP = Math.max(0, Math.min(1, probability != null ? probability : cum));
+
+    const meter = $("#wfMeter");
+    meter.innerHTML =
+      segs.map((s) => `
+        <div class="wfm-seg ${s.cls}" data-l="${(s.left * 100).toFixed(2)}" data-w="${(s.width * 100).toFixed(2)}">
+          ${s.label ? `<span>${s.label}</span>` : ""}
+        </div>`).join("") +
+      `<div class="wfm-marker" data-l="${(finalP * 100).toFixed(2)}"></div>`;
+    $("#wfMeterBase").textContent = `BASELINE ${(baseP * 100).toFixed(0)}%`;
+    $("#wfMeterFinal").textContent = `THIS APPLICANT ${(finalP * 100).toFixed(1)}%`;
+
     wfReal.innerHTML = factors
       .map((f) => {
-        const w = (Math.abs(f.impact) / max) * 46;
-        const cls = f.impact > 0 ? "pos" : "neg";
-        const impactTxt = `${f.impact > 0 ? "+" : "−"}${Math.abs(f.impact).toFixed(2)}`;
-        const arrow = f.impact > 0 ? "▲" : "▼";
+        const ptsCls = f.risk_points >= 0 ? "pos" : "neg";
+        const ptsTxt = `${f.risk_points >= 0 ? "+" : "−"}${Math.abs(f.risk_points).toFixed(1)} pts`;
+        const bar = Math.max(0.04, Math.abs(f.risk_points) / maxPts);
         return `
-        <div class="wfr-row" title="${f.feature} = ${fmtFeatureValue(f.feature, f.value)} (raw model feature)">
-          <div class="wfr-name">${prettyName(f.feature)}<small>${arrow} value ${fmtFeatureValue(f.feature, f.value)}</small></div>
-          <div class="wfr-track"><div class="wfr-bar ${cls}" data-w="${w}"></div></div>
-          <div class="wfr-impact ${cls}">${impactTxt}</div>
+        <div class="wfr-row" title="${f.feature} = ${fmtFeatureValue(f.feature, f.value)} · SHAP ${f.impact >= 0 ? "+" : "−"}${Math.abs(f.impact).toFixed(3)} (raw model feature)">
+          <div class="wfr-name">${prettyName(f.feature)}<small>${fmtFeatureValue(f.feature, f.value)}</small></div>
+          <div class="wfr-mini"><i class="${ptsCls}" style="--w:${bar}"></i></div>
+          <div class="wfr-impact ${ptsCls}">${ptsTxt}</div>
         </div>`;
       })
       .join("");
+
     if (REDUCED) {
-      $$(".wfr-bar", wfReal).forEach((b) => (b.style.transform = `scaleX(${b.dataset.w / 46})`));
+      $$(".wfm-seg", meter).forEach((s) => {
+        s.style.left = `${s.dataset.l}%`; s.style.width = `${s.dataset.w}%`;
+      });
+      $$(".wfm-marker", meter).forEach((m) => (m.style.left = `${m.dataset.l}%`));
+      $$(".wfr-mini i", wfReal).forEach((b) =>
+        (b.style.transform = `scaleX(${parseFloat(b.style.getPropertyValue("--w")) || 1})`));
       return;
     }
+    gsap.fromTo($$(".wfm-seg", meter),
+      { opacity: 0, scaleX: 0.001 },
+      { opacity: 1, scaleX: 1, duration: 0.5, stagger: 0.07, ease: "power2.out",
+        onStart: () => $$(".wfm-seg", meter).forEach((s) => {
+          s.style.left = `${s.dataset.l}%`; s.style.width = `${s.dataset.w}%`;
+          s.style.transformOrigin = "left center";
+        }) }
+    );
+    const marker = $(".wfm-marker", meter);
+    marker.style.left = `${marker.dataset.l}%`;
+    gsap.fromTo(marker, { opacity: 0 }, { opacity: 1, duration: 0.4, delay: 0.9 });
     gsap.fromTo($$(".wfr-row", wfReal),
       { opacity: 0, x: 18 },
-      { opacity: 1, x: 0, duration: 0.45, stagger: 0.06, ease: "power2.out" }
+      { opacity: 1, x: 0, duration: 0.45, stagger: 0.06, ease: "power2.out", delay: 0.3 }
     );
-    gsap.fromTo($$(".wfr-bar", wfReal),
+    gsap.fromTo($$(".wfr-mini i", wfReal),
       { scaleX: 0 },
-      { scaleX: (i, el) => parseFloat(el.dataset.w) / 46, duration: 0.6, stagger: 0.06, ease: "power2.out", delay: 0.15 }
+      { scaleX: (i, el) => parseFloat(el.style.getPropertyValue("--w")), duration: 0.6, stagger: 0.06, ease: "power2.out", delay: 0.4 }
     );
   }
 
@@ -398,7 +451,11 @@
       const data = await res.json();
       status.textContent = `OK — ${data.risk_tier} TIER · MODEL API v1`;
       animateGauge(data.probability);
-      renderWaterfall(data.shap_top_factors);
+      renderWaterfall(data.shap_top_factors, {
+        baseline_probability: data.baseline_probability,
+        other_factors_points: data.other_factors_points,
+        probability: data.probability,
+      });
     } catch (err) {
       status.textContent = `API UNREACHABLE — IS THE SERVICE RUNNING AT ${window.API_BASE}? (${err.message})`;
       status.classList.add("is-error");
