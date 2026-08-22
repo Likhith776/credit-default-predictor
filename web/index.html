@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Credit Default Predictor — LightGBM + SHAP</title>
+  <meta name="description" content="Portfolio ML project: LightGBM credit default risk model with per-applicant SHAP explainability, trained on 307,511 Home Credit loan applications." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="js/config.js"></script>
+</head>
+<body>
+
+  <!-- ================= LOADING SCREEN ================= -->
+  <div class="loader" id="loader" aria-hidden="true">
+    <div class="loader-inner">
+      <div class="loader-count mono" id="loaderCount">0%</div>
+      <div class="loader-label">CALIBRATING MODEL</div>
+      <div class="loader-bar"><span id="loaderBar"></span></div>
+    </div>
+  </div>
+
+  <!-- ================= NAV ================= -->
+  <nav class="nav" id="nav">
+    <a class="nav-logo" href="#home" data-scroll-to="#home">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M3 20V9l9-6 9 6v11" stroke="var(--accent)" stroke-width="1.6"/>
+        <path d="M9 20v-6h6v6" stroke="var(--accent)" stroke-width="1.6"/>
+      </svg>
+      <span>CDP</span>
+    </a>
+    <div class="nav-links" id="navLinks">
+      <a href="#home" data-scroll-to="#home">HOME</a>
+      <a href="#about" data-scroll-to="#about">ABOUT</a>
+      <a href="#how" data-scroll-to="#how">HOW IT WORKS</a>
+      <a href="#predict" data-scroll-to="#predict">PREDICT</a>
+      <a href="#metrics" data-scroll-to="#metrics">METRICS</a>
+      <a href="https://github.com/Likhith776/credit-default-predictor" target="_blank" rel="noopener">GITHUB</a>
+    </div>
+    <button class="nav-toggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false">
+      <span></span><span></span>
+    </button>
+  </nav>
+
+  <main id="main">
+
+    <!-- ================= HERO ================= -->
+    <section class="hero section" id="home">
+      <div class="container hero-grid">
+        <div class="hero-badge mono" data-reveal>
+          <span class="pulse-dot"></span>
+          <span><span data-count="307511">0</span> APPLICATIONS TRAINED&nbsp;&nbsp;·&nbsp;&nbsp;<span data-count-dec="0.781">0.000</span> CV AUC</span>
+        </div>
+        <h1 class="hero-title" data-reveal>CREDIT<br />DEFAULT<br /><span class="accent">PREDICTOR</span></h1>
+        <p class="hero-sub lede" data-reveal>A single LightGBM model reads seven relational tables of a borrower's financial life — and SHAP explains every score it gives, applicant by applicant.</p>
+        <div class="hero-cta" data-reveal>
+          <a class="btn btn-primary" href="#predict" data-scroll-to="#predict">TRY THE PREDICTOR
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2"/></svg>
+          </a>
+          <a class="btn btn-ghost" href="#how" data-scroll-to="#how">SEE THE PIPELINE</a>
+        </div>
+        <div class="hero-ticker mono" data-reveal aria-hidden="true">
+          <div class="ticker-track" id="tickerTrack"></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="angular-divider d-dark"></div>
+
+    <!-- ================= ABOUT ================= -->
+    <section class="section section-alt" id="about">
+      <div class="container narrow">
+        <div class="eyebrow" data-reveal>ABOUT THE MODEL</div>
+        <h2 data-reveal>One model.<br />Seven tables.<br />Every score explained.</h2>
+        <p class="lede" data-reveal>Built on the Kaggle Home Credit Default Risk dataset — 307,511 labeled loan applications joined to bureau histories, previous applications, installments, and card balances. LightGBM turns 299 engineered features into a default probability; SHAP turns that probability into a reason.</p>
+        <div class="about-facts" data-reveal>
+          <div class="fact"><span class="fact-num mono">01</span><span class="fact-label">Relational feature engineering — 5 aggregators collapse 56M+ rows of monthly history into one row per applicant.</span></div>
+          <div class="fact"><span class="fact-num mono">02</span><span class="fact-label">Peer-rank and trend features capture where an applicant sits in their cohort and which way their DPD is moving.</span></div>
+          <div class="fact"><span class="fact-num mono">03</span><span class="fact-label">The same SHAP explainer ships to every surface — API, site, and the original Streamlit demo.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="angular-divider d-dark flip"></div>
+
+    <!-- ================= HOW IT WORKS (pinned) ================= -->
+    <section class="section how-section" id="how">
+      <div class="container">
+        <div class="section-head">
+          <div class="eyebrow" data-reveal>HOW IT WORKS</div>
+          <h2 data-reveal>From application<br />to explanation.</h2>
+          <p class="lede" data-reveal>Five stages, one scroll. The panel on the left is the live pipeline state — scrub through and watch the applicant's SHAP waterfall build.</p>
+        </div>
+
+        <div class="how-pin" id="howPin">
+          <!-- pinned visual -->
+          <div class="how-visual" id="howVisual">
+            <div class="visual-stage" aria-hidden="true">
+              <div class="stage-caption mono" id="stageCaption">STAGE 01 — INTAKE</div>
+              <div class="stage-body">
+                <div class="intake-grid" id="intakeGrid">
+                  <div class="intake-cell">INCOME</div><div class="intake-cell">CREDIT</div>
+                  <div class="intake-cell">ANNUITY</div><div class="intake-cell">AGE</div>
+                  <div class="intake-cell">EMPLOYED</div><div class="intake-cell">FAMILY</div>
+                </div>
+                <div class="flow-lines" id="flowLines">
+                  <svg viewBox="0 0 300 120" preserveAspectRatio="none">
+                    <path class="fl" d="M10 10 C 120 10, 120 60, 290 60" />
+                    <path class="fl" d="M10 40 C 120 40, 120 60, 290 60" />
+                    <path class="fl" d="M10 70 C 120 70, 120 60, 290 60" />
+                    <path class="fl" d="M10 100 C 120 100, 120 60, 290 60" />
+                  </svg>
+                </div>
+                <div class="feature-box" id="featureBox">
+                  <div class="mono fb-title">FEATURE VECTOR</div>
+                  <div class="fb-features mono">
+                    <span>EXT_SOURCE_MEAN</span><span>CREDIT_TERM</span><span>RANK_CREDIT_INCOME_RATIO</span>
+                    <span>CC_UTILIZATION_TREND</span><span>BUREAU_DPD_DIFF_MEAN</span><span>+294 more</span>
+                  </div>
+                </div>
+                <div class="lgbm-box" id="lgbmBox">
+                  <div class="mono lb-title">LIGHTGBM · 263 TREES</div>
+                  <div class="lb-trees" id="lbTrees"></div>
+                </div>
+                <div class="waterfall-mock" id="waterfallMock">
+                  <div class="mono wf-title">SHAP — THIS APPLICANT</div>
+                  <div class="wf-bars" id="wfBars"></div>
+                </div>
+                <div class="verdict-box" id="verdictBox">
+                  <div class="mono vb-label">P(DEFAULT)</div>
+                  <div class="vb-value mono" id="vbValue">0.000</div>
+                  <div class="vb-tier mono" id="vbTier">—</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- scrubbing steps -->
+          <div class="how-steps" id="howSteps">
+            <article class="step is-active" data-step="0">
+              <div class="step-num mono">01</div>
+              <h3>Applicant data in</h3>
+              <p>Eight inputs — income, loan amount, annuity, employment, age, family, education, contract type. The same fields a loan officer would write down first.</p>
+            </article>
+            <article class="step" data-step="1">
+              <div class="step-num mono">02</div>
+              <h3>Feature engineering</h3>
+              <p>Unfilled fields take their training medians; domain ratios, peer ranks, and one-hot columns are computed — a 299-dimensional vector from 7 tables.</p>
+            </article>
+            <article class="step" data-step="2">
+              <div class="step-num mono">03</div>
+              <h3>LightGBM scoring</h3>
+              <p>A single gradient-boosted model — 263 trees, scale-pos-weighted for the 8% default rate — outputs a calibrated default probability.</p>
+            </article>
+            <article class="step" data-step="3">
+              <div class="step-num mono">04</div>
+              <h3>SHAP explanation</h3>
+              <p>The TreeExplainer decomposes this individual score into per-feature impacts: red pushed risk up, cyan pushed it down, for this applicant specifically.</p>
+            </article>
+            <article class="step" data-step="4">
+              <div class="step-num mono">05</div>
+              <h3>Risk verdict out</h3>
+              <p>Probability, tier, and the top factors — everything a human needs to agree or disagree with the model.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="angular-divider d-dark"></div>
+
+    <!-- ================= PREDICT ================= -->
+    <section class="section section-alt" id="predict">
+      <div class="container narrow">
+        <div class="section-head">
+          <div class="eyebrow" data-reveal>THE PREDICTOR</div>
+          <h2 data-reveal>Score a real<br />application.</h2>
+          <p class="lede" data-reveal>This form hits the live model API — the same LightGBM + SHAP artifacts this repo ships. Change the inputs, watch the explanation change.</p>
+        </div>
+
+        <div class="predict-grid">
+          <form class="predict-form card" id="predictForm" data-reveal>
+            <div class="field">
+              <label for="f-income">Annual income</label>
+              <input id="f-income" name="income" type="number" min="25000" max="2000000" step="1000" value="135000" required />
+            </div>
+            <div class="field">
+              <label for="f-credit">Loan amount</label>
+              <input id="f-credit" name="credit" type="number" min="50000" max="3000000" step="10000" value="600000" required />
+            </div>
+            <div class="field">
+              <label for="f-annuity">Loan annuity / year</label>
+              <input id="f-annuity" name="annuity" type="number" min="5000" max="200000" step="1000" value="27000" required />
+            </div>
+            <div class="field">
+              <label for="f-employed">Employment duration <span class="field-val mono" id="v-employed">5.0 yrs</span></label>
+              <input id="f-employed" name="employed_years" type="range" min="0" max="40" step="0.5" value="5" />
+            </div>
+            <div class="field">
+              <label for="f-age">Age <span class="field-val mono" id="v-age">35</span></label>
+              <input id="f-age" name="age" type="range" min="18" max="70" step="1" value="35" />
+            </div>
+            <div class="field">
+              <label for="f-family">Family members</label>
+              <select id="f-family" name="family_members">
+                <option value="1">1</option><option value="2" selected>2</option><option value="3">3</option>
+                <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+                <option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="f-education">Education</label>
+              <select id="f-education" name="education">
+                <option selected>Secondary/secondary special</option>
+                <option>Higher education</option>
+                <option>Incomplete higher</option>
+                <option>Lower secondary</option>
+                <option>Academic degree</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="f-contract">Contract type</label>
+              <select id="f-contract" name="contract_type">
+                <option selected>Cash loans</option>
+                <option>Revolving loans</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-block" type="submit" id="predictBtn">ASSESS DEFAULT RISK</button>
+            <p class="form-status mono" id="formStatus" role="status"></p>
+          </form>
+
+          <div class="predict-result" data-reveal>
+            <div class="card gauge-card" id="gaugeCard">
+              <div class="gauge-wrap">
+                <svg viewBox="0 0 200 120" class="gauge" aria-hidden="true">
+                  <path class="gauge-track" d="M20 110 A 80 80 0 0 1 180 110" />
+                  <path class="gauge-zone z-low"    d="M20 110 A 80 80 0 0 1 62 39"  />
+                  <path class="gauge-zone z-mid"    d="M62 39 A 80 80 0 0 1 132 42"  />
+                  <path class="gauge-zone z-high"   d="M132 42 A 80 80 0 0 1 180 110"/>
+                  <g class="gauge-needle" id="gaugeNeedle">
+                    <line x1="100" y1="110" x2="100" y2="40" />
+                    <circle cx="100" cy="110" r="5" />
+                  </g>
+                </svg>
+                <div class="gauge-readout">
+                  <div class="gauge-value mono" id="gaugeValue">—</div>
+                  <div class="gauge-tier mono" id="gaugeTier">AWAITING INPUT</div>
+                </div>
+              </div>
+              <div class="gauge-scale mono"><span>0%</span><span>20%</span><span>50%</span><span>100%</span></div>
+            </div>
+
+            <div class="card waterfall-card" id="waterfallCard">
+              <div class="card-head">
+                <span class="mono card-index">01</span>
+                <span class="card-title">WHY THIS SCORE</span>
+              </div>
+              <div class="wf-real-bars" id="wfRealBars">
+                <p class="wf-empty">Submit an application to generate a per-applicant SHAP explanation.</p>
+              </div>
+              <p class="wf-caption">These factors moved <em>this specific</em> applicant's score — not the model's overall top features.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="angular-divider d-dark flip"></div>
+
+    <!-- ================= METRICS ================= -->
+    <section class="section" id="metrics">
+      <div class="container">
+        <div class="section-head">
+          <div class="eyebrow" data-reveal>MODEL SPECIFICATIONS</div>
+          <h2 data-reveal>The numbers.<br />All of them real.</h2>
+          <p class="lede" data-reveal>Pulled straight from <span class="mono inline-code">models/model_metrics.json</span> and <span class="mono inline-code">feature_names.json</span> at build time — nothing on this page is decorative.</p>
+        </div>
+        <div class="specs-grid">
+          <div class="spec card" data-reveal>
+            <svg viewBox="0 0 24 24" fill="none"><path d="M3 17l5-6 4 3 6-8" stroke-width="1.6" class="ico"/><path d="M14 6h4v4" stroke-width="1.6" class="ico"/></svg>
+            <h3>CV AUC (5-fold)</h3><p class="mono big">0.7814</p><p>Stratified 5-fold, early stopping on every fold.</p>
+          </div>
+          <div class="spec card" data-reveal>
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 19V5m0 14h16" stroke-width="1.6" class="ico"/><path d="M7 15l4-6 3 3 5-7" stroke-width="1.6" class="ico"/></svg>
+            <h3>Gini coefficient</h3><p class="mono big">0.5629</p><p>2 × AUC − 1, the scale credit scoring lives on.</p>
+          </div>
+          <div class="spec card" data-reveal>
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke-width="1.6" class="ico"/><path d="M12 4v8l6 4" stroke-width="1.6" class="ico"/></svg>
+            <h3>Validation AUC</h3><p class="mono big">0.7834</p><p>80/20 holdout, scored by a model that never saw it.</p>
+          </div>
+          <div class="spec card" data-reveal>
+            <svg viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="6" rx="7" ry="3" stroke-width="1.6" class="ico"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6" stroke-width="1.6" class="ico"/></svg>
+            <h3>Training data</h3><p class="mono big">307,511</p><p>Labeled applications across 7 relational tables.</p>
+          </div>
+          <div class="spec card" data-reveal>
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h10M4 18h13" stroke-width="1.6" class="ico"/></svg>
+            <h3>Features</h3><p class="mono big">299</p><p>Domain ratios, peer ranks, trend/velocity, one-hots.</p>
+          </div>
+          <div class="spec card" data-reveal>
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke-width="1.6" class="ico"/><path d="M12 8v4l3 2" stroke-width="1.6" class="ico"/></svg>
+            <h3>Training time</h3><p class="mono big">≈ 2 min</p><p>Full 5-fold CV + final fit, on a laptop CPU.</p>
+          </div>
+          <div class="spec card" data-reveal>
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z" stroke-width="1.6" class="ico"/></svg>
+            <h3>Model</h3><p class="mono big">LightGBM</p><p>Single model, no ensembling — 263 trees, 63 leaves.</p>
+          </div>
+          <div class="spec card" data-reveal>
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v3m0 12v3M3 12h3m12 0h3" stroke-width="1.6" class="ico"/><circle cx="12" cy="12" r="4" stroke-width="1.6" class="ico"/></svg>
+            <h3>Explainability</h3><p class="mono big">SHAP</p><p>TreeExplainer — per-applicant, not just global.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= LIMITATIONS ================= -->
+    <section class="section section-alt" id="limitations">
+      <div class="container narrow">
+        <div class="eyebrow" data-reveal>LIMITATIONS</div>
+        <h2 data-reveal>What this is not.</h2>
+        <p class="lede" data-reveal>This is a modeling and explainability portfolio piece, not a lending system. The risk thresholds are illustrative, not calibrated to a real cost function; no fairness or disparate-impact testing has been performed across protected attributes; and the peer-rank features reference the training population, so a real deployment would need periodic recalibration as the applicant pool shifts.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="footer">
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <span class="mono">CREDIT DEFAULT PREDICTOR</span>
+        <p>LightGBM · SHAP · Home Credit Default Risk</p>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/Likhith776/credit-default-predictor" target="_blank" rel="noopener">GITHUB ↗</a>
+        <a href="https://credit-default-predictor1.streamlit.app" target="_blank" rel="noopener">STREAMLIT DEMO ↗</a>
+        <!-- TODO: add your LinkedIn / resume URLs here -->
+      </div>
+    </div>
+    <div class="container footer-note mono">BUILT AS A PORTFOLIO DEMONSTRATION — NOT A LENDING DECISION TOOL</div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.14/dist/lenis.min.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

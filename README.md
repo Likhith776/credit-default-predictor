@@ -25,6 +25,10 @@ probability gauge, a risk verdict, and a per-applicant SHAP breakdown of the
 top factors that moved that specific score. The Model Insights tab shows the
 global feature importance and SHAP summary plots from training.
 
+<!-- Live site: uncomment and fill the deployed custom-frontend URL here, e.g.
+**Custom frontend (GSAP + FastAPI) → [your-site.vercel.app](https://your-site.vercel.app)**
+-->
+
 ## 📈 Model Performance
 
 | Metric | Score |
@@ -202,6 +206,39 @@ train the full model in a free Colab session:
    dependencies — Streamlit Cloud installs `app/requirements.txt` automatically.
 6. Click **Deploy**. First boot takes a minute while it pulls the LFS model
    files; the app then loads entirely from the repo, no database needed.
+
+## 🖥️ Custom Frontend + API
+
+Besides the Streamlit demo, the repo ships a portfolio-grade custom site and
+a thin model API:
+
+- **`api/`** — FastAPI service wrapping the same artifacts
+  (`lgb_model.pkl`, `shap_explainer.pkl`, `training_medians.json`).
+  `POST /predict` returns the probability, risk tier, and the top-8 SHAP
+  factors for that specific applicant; `GET /health` serves as a warm-up
+  ping. CORS is pre-configured for common local ports and can be extended
+  via the `API_ORIGINS` env var.
+- **`web/`** — static frontend (plain HTML/CSS/JS, no framework): dark
+  neo-technical aesthetic, GSAP + ScrollTrigger pinned scroll storytelling
+  for the five pipeline stages, Lenis inertial scrolling, a live predict
+  form wired to the API with an animated gauge and per-applicant SHAP
+  waterfall. Fully responsive, and `prefers-reduced-motion` falls back to
+  simple fades with no pinning.
+
+Why both? Streamlit is unbeatable for fast internal iteration, but its
+rendering loop caps motion design. The custom frontend exists to demonstrate
+the model behind a real product surface — engineered scroll interactions,
+one accent-color system, and the same explainability story told visually.
+
+```bash
+# Run locally (two terminals)
+uvicorn api.main:app --port 8000                 # from the repo root
+python -m http.server 5500 -d web                # then open http://localhost:5500
+```
+
+Set the API origin once in `web/js/config.js` (`window.API_BASE`) before
+deploying the frontend to Vercel/Netlify and the API to Render/Railway —
+both free tiers load the LFS-tracked model artifacts straight from the repo.
 
 ## 📊 Dataset
 
