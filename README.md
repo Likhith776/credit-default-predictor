@@ -18,15 +18,16 @@ just say *how risky* an applicant is, it shows *why*.
 
 ## 🔮 Live Demo
 
-**Try the live prediction app → [credit-default-predictor1.streamlit.app](https://credit-default-predictor1.streamlit.app)**
+**Try the live site → [credit-default-predictor-psi.vercel.app](https://credit-default-predictor-psi.vercel.app)**
 
-Enter an applicant's income, loan size, and history — get an instant default
+Enter an applicant's income, loan size, and history — get an animated default
 probability gauge, a risk verdict, and a per-applicant SHAP breakdown of the
-top factors that moved that specific score. The Model Insights tab shows the
-global feature importance and SHAP summary plots from training.
+top factors that moved that specific score. Scroll the pinned five-stage
+pipeline walkthrough, and every metric on the site is pulled from the real
+training artifacts.
 
-**Custom frontend (GSAP + FastAPI) → [credit-default-predictor-psi.vercel.app](https://credit-default-predictor-psi.vercel.app)**
-· Model API: [credit-default-predictor-k5am.onrender.com](https://credit-default-predictor-k5am.onrender.com)
+Model API: [credit-default-predictor-k5am.onrender.com](https://credit-default-predictor-k5am.onrender.com)
+(`/predict` · `/health` · `/docs`)
 
 ## 📈 Model Performance
 
@@ -131,10 +132,17 @@ credit-default-predictor/
 │   └── models/
 │       ├── train.py                  # 5-fold CV, early stopping, SHAP export
 │       └── predict.py                # batch scoring with feature alignment
-├── app/
-│   ├── streamlit_app.py              # 3-tab app: Predict / Insights / About
-│   └── requirements.txt              # deployment-only dependencies
-├── .streamlit/config.toml            # dark theme
+├── api/
+│   ├── main.py                     # FastAPI: /predict + /health, CORS
+│   └── requirements.txt            # API-only dependencies
+├── web/                            # static custom frontend (Vercel)
+│   ├── index.html
+│   ├── css/style.css
+│   └── js/{config,main}.js
+├── app/                            # original Streamlit demo (internal)
+│   ├── streamlit_app.py            # 3-tab app: Predict / Insights / About
+│   └── requirements.txt
+├── .streamlit/config.toml          # dark theme for the Streamlit demo
 ├── .gitattributes                    # Git LFS routes for models/*
 ├── .gitignore
 ├── LICENSE
@@ -163,8 +171,9 @@ python -m src.features.feature_engineering --split test     # builds test parque
 python -m src.models.train                                  # ~2 min on a laptop
 python -m src.models.predict --input data/processed/test_features.parquet
 
-# 4. Launch the app
-streamlit run app/streamlit_app.py
+# 4. Serve it locally
+uvicorn api.main:app --port 8000          # model API
+python -m http.server 5500 -d web         # then open http://localhost:5500
 ```
 
 ## ☁️ Training on Google Colab (free)
@@ -187,29 +196,13 @@ train the full model in a free Colab session:
    Training with 5-fold CV + early stopping takes roughly 2 minutes on a
    Colab CPU runtime; a GPU isn't needed.
 4. **Download `models/`.** Grab the whole folder (model, SHAP explainer,
-   metrics, plots) and commit it to the repo so the Streamlit app deploys
-   with its weights via Git LFS.
+   metrics, plots) and commit it to the repo so the API and site deploy
+   with the weights via Git LFS.
 
-## 🌐 Deployment (Streamlit Community Cloud)
+## 🖥️ Frontend + API
 
-1. **Push to GitHub**, including `models/` (Git LFS handles the binaries):
-   ```bash
-   git lfs install
-   git add . && git commit -m "Add trained model and SHAP artifacts"
-   git push
-   ```
-2. Go to **[share.streamlit.io](https://share.streamlit.io)** and sign in with GitHub.
-3. Click **New app** → select the `credit-default-predictor` repo and branch.
-4. Set **Main file path** to `app/streamlit_app.py`.
-5. (Optional) In **Advanced settings**, pick a Python version and confirm the
-   dependencies — Streamlit Cloud installs `app/requirements.txt` automatically.
-6. Click **Deploy**. First boot takes a minute while it pulls the LFS model
-   files; the app then loads entirely from the repo, no database needed.
-
-## 🖥️ Custom Frontend + API
-
-Besides the Streamlit demo, the repo ships a portfolio-grade custom site and
-a thin model API:
+The public face of the project is a portfolio-grade custom site backed by a
+thin model API:
 
 - **`api/`** — FastAPI service wrapping the same artifacts
   (`lgb_model.pkl`, `shap_explainer.pkl`, `training_medians.json`).
@@ -224,10 +217,11 @@ a thin model API:
   waterfall. Fully responsive, and `prefers-reduced-motion` falls back to
   simple fades with no pinning.
 
-Why both? Streamlit is unbeatable for fast internal iteration, but its
-rendering loop caps motion design. The custom frontend exists to demonstrate
-the model behind a real product surface — engineered scroll interactions,
-one accent-color system, and the same explainability story told visually.
+Why a custom frontend at all? Streamlit is unbeatable for fast internal
+iteration — `app/` stays in the repo for exactly that — but its rendering
+loop caps motion design. The public site demonstrates the model behind a
+real product surface: engineered scroll interactions, one accent-color
+system, and the same explainability story told visually.
 
 ```bash
 # Run locally (two terminals)
@@ -238,6 +232,15 @@ python -m http.server 5500 -d web                # then open http://localhost:55
 Set the API origin once in `web/js/config.js` (`window.API_BASE`) before
 deploying the frontend to Vercel/Netlify and the API to Render/Railway —
 both free tiers load the LFS-tracked model artifacts straight from the repo.
+
+**Current production setup** (the links at the top of this README):
+
+- **API on Render** — repo root, build `pip install -r api/requirements.txt`,
+  start `uvicorn api.main:app --host 0.0.0.0 --port $PORT`. The deployed
+  frontend origin is in the `ALLOWED_ORIGINS` list in `api/main.py`.
+- **Site on Vercel** — root directory `web/`, static, no build step.
+- Note: Render's free tier sleeps after ~15 min idle; the first request
+  after a cold start takes 30–60 s while the model artifacts reload.
 
 ## 📊 Dataset
 
