@@ -256,6 +256,69 @@
     return v.toFixed(3);
   }
 
+  /* Human label for a feature's raw value: -999 is the pipeline's
+   * missing-value sentinel, and DAYS_* columns are negative day counts
+   * that read better as years. */
+  function fmtFeatureValue(feature, v) {
+    if (v === -999) return "n/a";
+    if (/^DAYS_/.test(feature) && Math.abs(v) > 500)
+      return `${(Math.abs(v) / 365).toFixed(1)} yrs`;
+    return fmtVal(v);
+  }
+
+  /* Human-readable names for the features that surface most often in SHAP
+   * top-8 lists; anything unmapped falls back to a cleaned-up version of
+   * the raw name (prefixes stripped, underscores spaced). */
+  const PRETTY_NAMES = {
+    EXT_SOURCE_MEAN: "External risk score (mean)",
+    EXT_SOURCE_MIN: "External risk score (min)",
+    EXT_SOURCE_1: "External risk score 1",
+    EXT_SOURCE_2: "External risk score 2",
+    EXT_SOURCE_3: "External risk score 3",
+    CREDIT_TERM: "Credit term (loan ÷ annuity)",
+    CREDIT_INCOME_RATIO: "Loan-to-income ratio",
+    ANNUITY_INCOME_RATIO: "Debt burden (annuity ÷ income)",
+    DAYS_EMPLOYED_RATIO: "Life spent employed",
+    INCOME_PER_PERSON: "Income per family member",
+    AMT_CREDIT: "Loan amount",
+    AMT_ANNUITY: "Loan annuity",
+    AMT_GOODS_PRICE: "Goods price",
+    AMT_INCOME_TOTAL: "Annual income",
+    DAYS_BIRTH: "Age",
+    DAYS_EMPLOYED: "Employment length",
+    DAYS_ID_PUBLISH: "ID document age",
+    CODE_GENDER_M: "Gender: male",
+    CODE_GENDER_F: "Gender: female",
+    OWN_CAR_AGE: "Car age",
+    REGION_POPULATION_RELATIVE: "Home region population",
+    CC_UTILIZATION_MEAN: "Card utilization (avg)",
+    CC_UTILIZATION_TREND: "Card utilization trend",
+    CC_AMT_BALANCE_MEAN: "Card balance (avg)",
+    BUREAU_DPD_MEAN: "Bureau days past due (avg)",
+    BUREAU_DPD_TREND: "Bureau DPD trend",
+    INSTAL_LATE_RATIO: "Late installment ratio",
+    INSTAL_PAYMENT_RATIO_MEAN: "Installment payment ratio",
+    POS_SK_DPD_MEAN: "POS days past due (avg)",
+    PREV_APPROVAL_RATE: "Past approval rate",
+    PREV_AMT_DOWN_PAYMENT_MEAN: "Down payment on past loans",
+    POS_CNT_INSTALMENT_FUTURE_MEAN: "Remaining POS installments",
+    PREV_AMT_APPLICATION_MEAN: "Past application amount",
+    BUREAU_CREDIT_COUNT: "Bureau credit count",
+  };
+
+  function prettyName(raw) {
+    if (PRETTY_NAMES[raw]) return PRETTY_NAMES[raw];
+    let n = raw
+      .replace(/^(NAME|FLAG|RANK|ORGANIZATION_TYPE)_/, "")
+      .replace(/_BY_(INCOME_TYPE|ORGANIZATION_TYPE)$/, " vs cohort")
+      .replace(/_(MEAN|MAX|MIN)$/, "")
+      .replace(/_/g, " ")
+      .toLowerCase();
+    n = n.replace(/\b\w/g, (c) => c.toUpperCase());
+    if (/^Education:/.test(n)) return "Education — " + n.replace(/^Education: ?/, "");
+    return n;
+  }
+
   function animateGauge(prob) {
     // needle sweeps -90deg (0%) to +90deg (100%), eased — no snap
     const deg = -90 + prob * 180;
@@ -281,14 +344,16 @@
   function renderWaterfall(factors) {
     const max = Math.max(...factors.map((f) => Math.abs(f.impact))) || 1;
     wfReal.innerHTML = factors
-      .map((f, i) => {
+      .map((f) => {
         const w = (Math.abs(f.impact) / max) * 46;
         const cls = f.impact > 0 ? "pos" : "neg";
+        const impactTxt = `${f.impact > 0 ? "+" : "−"}${Math.abs(f.impact).toFixed(2)}`;
         const arrow = f.impact > 0 ? "▲" : "▼";
         return `
-        <div class="wfr-row">
-          <div class="wfr-name">${f.feature}<small>${arrow} ${fmtVal(f.value)}</small></div>
+        <div class="wfr-row" title="${f.feature} = ${fmtFeatureValue(f.feature, f.value)} (raw model feature)">
+          <div class="wfr-name">${prettyName(f.feature)}<small>${arrow} value ${fmtFeatureValue(f.feature, f.value)}</small></div>
           <div class="wfr-track"><div class="wfr-bar ${cls}" data-w="${w}"></div></div>
+          <div class="wfr-impact ${cls}">${impactTxt}</div>
         </div>`;
       })
       .join("");
